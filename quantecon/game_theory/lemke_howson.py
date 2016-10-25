@@ -16,6 +16,7 @@ from numba import jit
 
 
 TOL_PIV = 1e-10
+TOL_RATIO = 1e-10
 
 
 def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
@@ -88,7 +89,7 @@ def initialize_tableaux(payoff_matrices, tableaux, bases):
 
 
 @jit(nopython=True)
-def min_ratio_test(tableau, pivot):
+def min_ratio_test(tableau, basis, pivot):
     nrows = tableau.shape[0]
 
     row_min = 0
@@ -98,9 +99,14 @@ def min_ratio_test(tableau, pivot):
     for i in range(row_min+1, nrows):
         if tableau[i, pivot] <= 0:
             continue
-        if tableau[i, -1] * tableau[row_min, pivot] < \
-           tableau[row_min, -1] * tableau[i, pivot]:
-                row_min = i
+
+        lhs = tableau[i, -1] * tableau[row_min, pivot]
+        rhs = tableau[row_min, -1] * tableau[i, pivot]
+        if lhs - rhs <= -TOL_RATIO:  # Ratio smaller for i
+            row_min = i
+        elif np.abs(lhs-rhs) < TOL_RATIO:  # Ratio equal
+            if basis[i] < basis[row_min]:
+                row_min = i  # Break tie by smaller variable index
 
     return row_min
 
@@ -148,7 +154,7 @@ def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
     while True:
         for pl in pls:
             # Determine the leaving variable
-            row_min = min_ratio_test(tableaux[pl], pivot)
+            row_min = min_ratio_test(tableaux[pl], bases[pl], pivot)
 
             # Pivoting step: modify tableau in place
             pivoting(tableaux[pl], pivot, row_min)
