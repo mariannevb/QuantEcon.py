@@ -18,7 +18,7 @@ from numba import jit
 TOL_PIV = 1e-10
 
 
-def lemke_howson(g, init_pivot=0, max_iter=10**6):
+def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
     try:
         N = g.N
     except:
@@ -42,10 +42,20 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6):
     bases = tuple(np.empty(nums_actions[1-i], dtype=int) for i in range(N))
 
     initialize_tableaux(payoff_matrices, tableaux, bases)
-    lemke_howson_tbl(tableaux, bases, init_pivot, max_iter)
+    converged, num_iter = \
+        lemke_howson_tbl(tableaux, bases, init_pivot, max_iter)
     NE = get_mixed_actions(tableaux, bases)
 
-    return NE
+    if not full_output:
+        return NE
+
+    res = NashResult(NE=NE,
+                     converged=converged,
+                     num_iter=num_iter,
+                     max_iter=max_iter,
+                     init_pivot=init_pivot)
+
+    return NE, res
 
 
 @jit(nopython=True)
@@ -132,7 +142,7 @@ def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
 
     pivot = init_pivot
 
-    success = False
+    converged = False
     num_iter = 0
 
     while True:
@@ -149,7 +159,7 @@ def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
             num_iter += 1
 
             if pivot == init_pivot:
-                success = True
+                converged = True
                 break
             if num_iter >= max_iter:
                 break
@@ -157,7 +167,7 @@ def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
             continue
         break
 
-    return success, num_iter
+    return converged, num_iter
 
 
 @jit(nopython=True)
@@ -178,3 +188,48 @@ def get_mixed_actions(tableaux, bases):
             out[start:stop] /= sum_
 
     return out[:nums_actions[0]], out[nums_actions[0]:]
+
+
+class NashResult(dict):
+    """
+    Contain the information about the result of computation of Nash
+    equilibrium.
+
+    Attributes
+    ----------
+    NE : tuple(ndarray(float, ndim=1))
+        Computed Nash equilibrium.
+
+    converged : bool
+        Whether the routine has converged.
+
+    num_iter : int
+        Total number of iterations.
+
+    max_iter : int
+        Maximum number of iterations.
+
+    init_pivot : int
+        Initial pivot used.
+
+    """
+    # This is sourced from sicpy.optimize.OptimizeResult.
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+    def __repr__(self):
+        if self.keys():
+            m = max(map(len, list(self.keys()))) + 1
+            return '\n'.join([k.rjust(m) + ': ' + repr(v)
+                              for k, v in self.items()])
+        else:
+            return self.__class__.__name__ + "()"
+
+    def __dir__(self):
+        return self.keys()
