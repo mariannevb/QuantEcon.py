@@ -97,7 +97,7 @@ def min_ratio_test(tableau, basis, pivot):
         row_min += 1
 
     for i in range(row_min+1, nrows):
-        if tableau[i, pivot] <= 0:
+        if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
             continue
 
         lhs = tableau[i, -1] * tableau[row_min, pivot]
