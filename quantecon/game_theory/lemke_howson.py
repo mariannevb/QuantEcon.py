@@ -19,7 +19,8 @@ TOL_PIV = 1e-10
 TOL_RATIO_DIFF = 1e-15
 
 
-def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
+def lemke_howson(g, init_pivot=0, max_iter=10**6, lex_min=False,
+                 full_output=False):
     try:
         N = g.N
     except:
@@ -44,7 +45,7 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
 
     initialize_tableaux(payoff_matrices, tableaux, bases)
     converged, num_iter = \
-        lemke_howson_tbl(tableaux, bases, init_pivot, max_iter)
+        lemke_howson_tbl(tableaux, bases, init_pivot, max_iter, lex_min)
     NE = get_mixed_actions(tableaux, bases)
 
     if not full_output:
@@ -54,7 +55,8 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
                      converged=converged,
                      num_iter=num_iter,
                      max_iter=max_iter,
-                     init_pivot=init_pivot)
+                     init_pivot=init_pivot,
+                     lex_min=lex_min)
 
     return NE, res
 
@@ -89,23 +91,48 @@ def initialize_tableaux(payoff_matrices, tableaux, bases):
 
 
 @jit(nopython=True)
-def min_ratio_test(tableau, pivot):
-    nrows = tableau.shape[0]
+def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter, lex_min):
+    init_player = 0
+    for k in bases[0]:
+        if k == init_pivot:
+            init_player = 1
+            break
+    pls = [init_player, 1 - init_player]
 
-    row_min = 0
-    while tableau[row_min, pivot] < TOL_PIV:  # Treated as nonpositive
-        row_min += 1
+    pivot = init_pivot
 
-    for i in range(row_min+1, nrows):
-        if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
+    slack_starts = (tableaux[1].shape[0], 0)
+
+    converged = False
+    num_iter = 0
+
+    while True:
+        for pl in pls:
+            # Determine the leaving variable
+            if lex_min:
+                row_min = \
+                    lex_min_ratio_test(tableaux[pl], pivot, slack_starts[pl])
+            else:
+                row_min = min_ratio_test(tableaux[pl], pivot)
+
+            # Pivoting step: modify tableau in place
+            pivoting(tableaux[pl], pivot, row_min)
+
+            # Update the basic variables and the pivot
+            bases[pl][row_min], pivot = pivot, bases[pl][row_min]
+
+            num_iter += 1
+
+            if pivot == init_pivot:
+                converged = True
+                break
+            if num_iter >= max_iter:
+                break
+        else:
             continue
-        diff = tableau[i, -1] * tableau[row_min, pivot] - \
-            tableau[row_min, -1] * tableau[i, pivot]
-        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
-        if diff < -tol:  # Ratio smaller for i
-                row_min = i
+        break
 
-    return row_min
+    return converged, num_iter
 
 
 @jit(nopython=True)
@@ -135,42 +162,77 @@ def pivoting(tableau, pivot, pivot_row):
 
 
 @jit(nopython=True)
-def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
-    init_player = 0
-    for k in bases[0]:
-        if k == init_pivot:
-            init_player = 1
-            break
-    pls = [init_player, 1 - init_player]
+def min_ratio_test(tableau, pivot):
+    nrows = tableau.shape[0]
 
-    pivot = init_pivot
+    row_min = 0
+    while tableau[row_min, pivot] < TOL_PIV:  # Treated as nonpositive
+        row_min += 1
 
-    converged = False
-    num_iter = 0
-
-    while True:
-        for pl in pls:
-            # Determine the leaving variable
-            row_min = min_ratio_test(tableaux[pl], pivot)
-
-            # Pivoting step: modify tableau in place
-            pivoting(tableaux[pl], pivot, row_min)
-
-            # Update the basic variables and the pivot
-            bases[pl][row_min], pivot = pivot, bases[pl][row_min]
-
-            num_iter += 1
-
-            if pivot == init_pivot:
-                converged = True
-                break
-            if num_iter >= max_iter:
-                break
-        else:
+    for i in range(row_min+1, nrows):
+        if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
             continue
-        break
+        diff = tableau[i, -1] * tableau[row_min, pivot] - \
+            tableau[row_min, -1] * tableau[i, pivot]
+        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
+        if diff < -tol:  # Ratio smaller for i
+                row_min = i
 
-    return converged, num_iter
+    return row_min
+
+
+@jit(nopython=True)
+def min_ratio_test_no_tie_breaking(tableau, pivot, test_col,
+                                   argmins, num_argmins):
+    stop = num_argmins
+
+    # Find the first row whose pivot element is positive
+    start = 0
+    while tableau[argmins[start], pivot] < TOL_PIV:  # Treated as nonpositive
+        start += 1
+
+    row_min = argmins[start]
+    num_argmins = 1
+    argmins[num_argmins-1] = row_min
+
+    for k in range(start+1, stop):
+        i = argmins[k]
+        if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
+            continue
+        diff = tableau[i, test_col] * tableau[row_min, pivot] - \
+            tableau[row_min, test_col] * tableau[i, pivot]
+        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
+        if diff > tol:  # Ratio larger for i
+            continue
+        elif diff < -tol:  # Ratio smaller for i
+            num_argmins = 1
+        else:  # Ratio equal
+            num_argmins += 1
+        row_min = k
+        argmins[num_argmins-1] = row_min
+
+    return num_argmins
+
+
+@jit(nopython=True)
+def lex_min_ratio_test(tableau, pivot, slack_start):
+    nrows = tableau.shape[0]
+    argmins = np.arange(nrows)
+    num_argmins = nrows
+
+    num_argmins = min_ratio_test_no_tie_breaking(tableau, pivot, -1,
+                                                 argmins, num_argmins)
+    if num_argmins == 1:
+        return argmins[0]
+
+    for j in range(slack_start, slack_start+nrows):
+        if j == pivot:
+            continue
+        num_argmins = min_ratio_test_no_tie_breaking(tableau, pivot, j,
+                                                     argmins, num_argmins)
+        if num_argmins == 1:
+            break
+    return argmins[0]
 
 
 @jit(nopython=True)
