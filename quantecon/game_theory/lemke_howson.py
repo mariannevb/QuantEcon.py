@@ -16,6 +16,7 @@ from numba import jit
 
 
 TOL_PIV = 1e-10
+TOL_RATIO_DIFF = 1e-15
 
 
 def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
@@ -98,8 +99,10 @@ def min_ratio_test(tableau, pivot):
     for i in range(row_min+1, nrows):
         if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
             continue
-        if tableau[i, -1] * tableau[row_min, pivot] < \
-           tableau[row_min, -1] * tableau[i, pivot]:
+        diff = tableau[i, -1] * tableau[row_min, pivot] - \
+            tableau[row_min, -1] * tableau[i, pivot]
+        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
+        if diff < -tol:  # Ratio smaller for i
                 row_min = i
 
     return row_min
