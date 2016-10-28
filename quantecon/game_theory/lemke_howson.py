@@ -208,7 +208,7 @@ def min_ratio_test_no_tie_breaking(tableau, pivot, test_col,
             num_argmins = 1
         else:  # Ratio equal
             num_argmins += 1
-        row_min = k
+        row_min = i
         argmins[num_argmins-1] = row_min
 
     return num_argmins
