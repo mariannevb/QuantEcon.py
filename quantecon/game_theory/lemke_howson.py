@@ -165,18 +165,16 @@ def pivoting(tableau, pivot, pivot_row):
 def min_ratio_test(tableau, pivot):
     nrows = tableau.shape[0]
 
-    row_min = 0
-    while tableau[row_min, pivot] < TOL_PIV:  # Treated as nonpositive
-        row_min += 1
+    ratio_min = np.inf
+    row_min = -1  # dummy
 
-    for i in range(row_min+1, nrows):
+    for i in range(nrows):
         if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
             continue
-        diff = tableau[i, -1] * tableau[row_min, pivot] - \
-            tableau[row_min, -1] * tableau[i, pivot]
-        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
-        if diff < -tol:  # Ratio smaller for i
-                row_min = i
+        ratio = tableau[i, -1] / tableau[i, pivot]
+        if ratio < ratio_min - TOL_RATIO_DIFF:
+            row_min = i
+            ratio_min = ratio
 
     return row_min
 
@@ -184,34 +182,24 @@ def min_ratio_test(tableau, pivot):
 @jit(nopython=True)
 def min_ratio_test_no_tie_breaking(tableau, pivot, test_col,
                                    argmins, num_argmins):
-    stop = num_argmins
+    ratio_min = np.inf
+    num_argmins_new = 0
 
-    # Find the first row whose pivot element is positive
-    start = 0
-    while tableau[argmins[start], pivot] < TOL_PIV:  # Treated as nonpositive
-        start += 1
-
-    row_min = argmins[start]
-    num_argmins = 1
-    argmins[num_argmins-1] = row_min
-
-    for k in range(start+1, stop):
+    for k in range(num_argmins):
         i = argmins[k]
         if tableau[i, pivot] < TOL_PIV:  # Treated as nonpositive
             continue
-        diff = tableau[i, test_col] * tableau[row_min, pivot] - \
-            tableau[row_min, test_col] * tableau[i, pivot]
-        tol = TOL_RATIO_DIFF * tableau[row_min, pivot] * tableau[i, pivot]
-        if diff > tol:  # Ratio larger for i
+        ratio = tableau[i, test_col] / tableau[i, pivot]
+        if ratio > ratio_min + TOL_RATIO_DIFF:  # Ratio large for i
             continue
-        elif diff < -tol:  # Ratio smaller for i
-            num_argmins = 1
+        elif ratio < ratio_min - TOL_RATIO_DIFF:  # Ratio smaller for i
+            ratio_min = ratio
+            num_argmins_new = 1
         else:  # Ratio equal
-            num_argmins += 1
-        row_min = i
-        argmins[num_argmins-1] = row_min
+            num_argmins_new += 1
+        argmins[num_argmins_new-1] = i
 
-    return num_argmins
+    return num_argmins_new
 
 
 @jit(nopython=True)
