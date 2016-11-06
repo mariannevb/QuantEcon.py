@@ -126,7 +126,7 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
     return NE, res
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def initialize_tableaux(payoff_matrices, tableaux, bases):
     """
     Given a tuple of payoff matrices, initialize the tableau and basis
@@ -221,7 +221,7 @@ def initialize_tableaux(payoff_matrices, tableaux, bases):
     return tableaux, bases
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
     """
     Main body of the Lemke-Howson algorithm implementation.
@@ -324,7 +324,7 @@ def lemke_howson_tbl(tableaux, bases, init_pivot, max_iter):
     return converged, num_iter
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def pivoting(tableau, pivot, pivot_row):
     """
     Perform a pivoting step. Modify `tableau` in place.
@@ -364,7 +364,7 @@ def pivoting(tableau, pivot, pivot_row):
     return tableau
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def min_ratio_test_no_tie_breaking(tableau, pivot, test_col,
                                    argmins, num_candidates):
     """
@@ -417,7 +417,7 @@ def min_ratio_test_no_tie_breaking(tableau, pivot, test_col,
     return num_argmins
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def lex_min_ratio_test(tableau, pivot, slack_start, argmins):
     """
     Perform the lexico-minimum ratio test.
@@ -465,7 +465,7 @@ def lex_min_ratio_test(tableau, pivot, slack_start, argmins):
     return argmins[0]
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def get_mixed_actions(tableaux, bases):
     """
     From `tableaux` and `bases`, extract non-slack basic variables and
