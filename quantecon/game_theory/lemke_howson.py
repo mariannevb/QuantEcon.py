@@ -4,16 +4,6 @@ Author: Daisuke Oyama
 Compute mixed Nash equilibria of a 2-player normal form game by the
 Lemke-Howson algorithm.
 
-References
-----------
-* C. E. Lemke and J. T. Howson, "Equilibrium Points of Bimatrix Games,"
-  Journal of the Society for Industrial and Applied Mathematics (1964),
-  413-423.
-
-* B. von Stengel, "Equilibrium Computation for Two-Player Games in
-  Strategic and Extensive Form," Chapter 3, N. Nisan, T. Roughgarden, E.
-  Tardos, and V. Vazirani eds., Algorithmic Game Theory, 2007.
-
 """
 import numpy as np
 from numba import jit
@@ -26,9 +16,8 @@ TOL_RATIO_DIFF = 1e-15
 def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
     """
     Find one mixed-action Nash equilibrium of a 2-player normal form
-    game by the Lemke-Howson algorithm (Lemke and Howson 1964),
-    implemented by "comprementary pivoting" (see, e.g., von Stengel
-    2007 for details).
+    game by the Lemke-Howson algorithm [1]_, implemented by
+    "comprementary pivoting" (see, e.g., von Stengel [2]_ for details).
 
     Parameters
     ----------
@@ -44,8 +33,8 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
         Maximum number of pivoting steps.
 
     full_output : bool, optional(default=False)
-        If True, the computed Nash equilibrium is returned. If False,
-        the return value is `(NE, res)`, where `NE` is the Nash
+        If False, only the computed Nash equilibrium is returned. If
+        True, the return value is `(NE, res)`, where `NE` is the Nash
         equilibrium and `res` is a `NashResult` object.
 
     Returns
@@ -59,7 +48,7 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
 
     Examples
     --------
-    Consider the following game from von Stengel (2007).
+    Consider the following game from von Stengel [2]_:
 
     >>> bimatrix = [[(3, 3), (3, 2)],
     ...             [(2, 2), (5, 6)],
@@ -68,12 +57,12 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
 
     Obtain a Nash equilibrium of this game by `lemke_howson` with player
     0's action 1 (out of the three actions 0, 1, and 2) as the initial
-    pivot.
+    pivot:
 
     >>> lemke_howson(g, init_pivot=1)
     (array([ 0.    ,  0.3333,  0.6667]), array([ 0.3333,  0.6667]))
 
-    Additional information is returned if `full_output` is set True.
+    Additional information is returned if `full_output` is set True:
 
     >>> NE, res = lemke_howson(g, init_pivot=1, full_output=True)
     >>> res.converged  # Whether the routine has converged
@@ -85,6 +74,17 @@ def lemke_howson(g, init_pivot=0, max_iter=10**6, full_output=False):
     -----
     This routine is implemented with floating point arithmetic and thus
     is subject to numerical instability.
+
+    References
+    ----------
+    .. [1] C. E. Lemke and J. T. Howson, "Equilibrium Points of Bimatrix
+       Games," Journal of the Society for Industrial and Applied
+       Mathematics (1964), 413-423.
+
+    .. [2] B. von Stengel, "Equilibrium Computation for Two-Player Games
+       in Strategic and Extensive Form," Chapter 3, N. Nisan, T.
+       Roughgarden, E. Tardos, and V. Vazirani eds., Algorithmic Game
+       Theory, 2007.
 
     """
     try:
